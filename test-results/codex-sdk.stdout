@@ -1,0 +1,5 @@
+verified ApiError::Retryable: http503: configured startup
+verified ApiError::Retryable: context: configured terminal
+verified ApiError::Retryable: quota: configured terminal
+verified ApiError::Retryable: streamboom: configured text
+verified normal Codex response completion
