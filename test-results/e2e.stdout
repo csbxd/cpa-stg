@@ -1,0 +1,18 @@
+PASS startup http401
+PASS startup http429
+PASS startup http503
+PASS terminal context
+PASS terminal quota
+PASS terminal text zero delay
+PASS success, unmatched and endpoint isolation
+PASS nested concurrency: no bypass, no double charging
+PASS nested token bucket rate
+PASS queue full, timeout, channel isolation and recovery
+PASS active stream cancellation releases credential
+PASS queued cancellation prevents ghost upstream execution
+PASS hot reload wakes queue without losing active slots
+PASS CPA retry reacquires and charges the same credential
+PASS shutdown with an active wrapped stream
+PASS Codex Responses WebSocket error mapping
+PASS official Codex SDK parses Retryable and successful completion
+17 end-to-end checks passed
