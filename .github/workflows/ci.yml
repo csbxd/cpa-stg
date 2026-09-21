@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the Cargo.toml version after every check passes
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            library: libcpa_stg.so
+          - os: macos-latest
+            library: libcpa_stg.dylib
+          - os: windows-latest
+            library: cpa_stg.dll
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo build --workspace --release --locked
+      - run: python scripts/abi_smoke.py target/release/${{ matrix.library }}
+      - name: Package only this CI build
+        run: |
+          python -c "import shutil; shutil.rmtree('dist', ignore_errors=True)"
+          python scripts/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpa-stg-${{ matrix.os }}
+          path: dist/*
+          if-no-files-found: error
+
+  e2e:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+      - uses: actions/checkout@v4
+        with:
+          repository: csbxd/CLIProxyAPI
+          ref: 61fdfc341b96178a8dcb53f2efc46cbc341d267c
+          path: target/cpa-source
+      - run: go build -o ../cpa ./cmd/server
+        working-directory: target/cpa-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: cpa-stg-ubuntu-24.04
+          path: target/ci-linux
+      - name: Verify and load the exact CI release libraries
+        run: |
+          (cd target/ci-linux && sha256sum --check checksums.txt)
+          python - <<'PY'
+          import pathlib, zipfile
+          archives = list(pathlib.Path('target/ci-linux').glob('*.zip'))
+          assert len(archives) == 1, archives
+          output = pathlib.Path('target/release')
+          output.mkdir(parents=True, exist_ok=True)
+          with zipfile.ZipFile(archives[0]) as bundle:
+              for name in ['cpa-stg', 'cpa-stg-router']:
+                  (output / ('lib' + name.replace('-', '_') + '.so')).write_bytes(
+                      bundle.read('linux/amd64/' + name + '.so'))
+          PY
+      - run: python scripts/e2e.py --cpa target/cpa
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-evidence
+          path: |
+            target/e2e/report.json
+            target/e2e/**/cpa.log
+
+  release:
+    needs: [test, e2e]
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish &&
+       github.ref_name == github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cpa-stg-*
+          path: target/release-artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-evidence
+          path: target/release-evidence
+      - name: Prepare verified assets and version
+        id: release
+        run: python scripts/prepare_release.py
+      - name: Publish CI artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Refuse to overwrite an existing release or move an existing tag.
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; refusing to replace it."
+            exit 1
+          fi
+          if git rev-parse --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$GITHUB_SHA"
+          fi
+          gh release create "$RELEASE_TAG" dist/* --draft \
+            --target "$GITHUB_SHA" --title "CPA STG $RELEASE_TAG" \
+            --notes-file target/release-notes.md
+          gh release edit "$RELEASE_TAG" --draft=false
