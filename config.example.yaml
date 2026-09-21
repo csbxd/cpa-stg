@@ -1,0 +1,56 @@
+# Merge into CPA config.yaml; install both native components from the package.
+plugins:
+  enabled: true
+  configs:
+    cpa-stg:
+      enabled: true
+      priority: 100
+      max_tracked_requests: 10000
+      max_credentials: 10000
+      credentials:
+        default:
+          enabled: true
+          requests_per_minute: 60
+          burst: 1
+          max_concurrency: 2
+          max_queue: 100
+          queue_timeout_ms: 30000
+        # Use the exact selected_auth_id from CPA, not an API secret or label.
+        # Each override is a complete policy using built-in defaults for omissions.
+        overrides:
+          example-credential-id:
+            enabled: true
+            requests_per_minute: 30
+            burst: 2
+            max_concurrency: 1
+            max_queue: 50
+            queue_timeout_ms: 60000
+      api_keys: {}
+    # The router has a separate plugin ID so nested CPA execution still calls
+    # cpa-stg's credential admission and lifecycle hooks.
+    cpa-stg-router:
+      enabled: true
+      priority: 100
+      max_tracked_requests: 10000
+      error_mapping:
+        enabled: true
+        rules:
+          - name: transient-http
+            match:
+              http_statuses: [429, 502, 503, 504]
+            retryable:
+              message: "The upstream is temporarily unavailable. Please retry."
+              delay: 1500ms
+          - name: context-example
+            match:
+              # CPA may normalize context_length_exceeded to context_too_large.
+              codes: [context_length_exceeded, context_too_large]
+            retryable:
+              message: "The channel rejected this context. Please retry."
+              delay: null
+          - name: terminal-message-example
+            match:
+              message_contains: "server overloaded"
+            retryable:
+              message: "The upstream is overloaded. Please retry."
+              delay: 2s
