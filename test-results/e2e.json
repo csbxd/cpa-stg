@@ -1,0 +1,103 @@
+{
+  "cpa_commit": "61fdfc341b96178a8dcb53f2efc46cbc341d267c",
+  "codex_sdk_commit": "f07aaf920b14d7a746e435add34b8bbd37da5da6",
+  "transport": "real HTTP/WebSocket CPA and native C ABI; local synthetic Codex upstream",
+  "results": [
+    {
+      "test": "startup http401",
+      "passed": true,
+      "seconds": 0.006
+    },
+    {
+      "test": "startup http429",
+      "passed": true,
+      "seconds": 0.006
+    },
+    {
+      "test": "startup http503",
+      "passed": true,
+      "seconds": 0.005
+    },
+    {
+      "test": "terminal context",
+      "passed": true,
+      "seconds": 0.085
+    },
+    {
+      "test": "terminal quota",
+      "passed": true,
+      "seconds": 0.086
+    },
+    {
+      "test": "terminal text zero delay",
+      "passed": true,
+      "seconds": 0.089
+    },
+    {
+      "test": "success, unmatched and endpoint isolation",
+      "passed": true,
+      "seconds": 0.124
+    },
+    {
+      "test": "nested concurrency: no bypass, no double charging",
+      "passed": true,
+      "seconds": 1.028
+    },
+    {
+      "test": "nested token bucket rate",
+      "passed": true,
+      "seconds": 0.715
+    },
+    {
+      "test": "queue full, timeout, channel isolation and recovery",
+      "passed": true,
+      "seconds": 0.677
+    },
+    {
+      "test": "active stream cancellation releases credential",
+      "passed": true,
+      "seconds": 0.111
+    },
+    {
+      "test": "queued cancellation prevents ghost upstream execution",
+      "passed": true,
+      "seconds": 0.54
+    },
+    {
+      "test": "hot reload wakes queue without losing active slots",
+      "passed": true,
+      "seconds": 0.425
+    },
+    {
+      "test": "CPA retry reacquires and charges the same credential",
+      "passed": true,
+      "seconds": 0.312
+    },
+    {
+      "test": "shutdown with an active wrapped stream",
+      "passed": true,
+      "seconds": 29.881
+    },
+    {
+      "test": "Codex Responses WebSocket error mapping",
+      "passed": true,
+      "seconds": 0.005
+    },
+    {
+      "test": "official Codex SDK parses Retryable and successful completion",
+      "passed": true,
+      "seconds": 0.396
+    }
+  ],
+  "verified_at": "2026-09-21",
+  "platform": "linux/amd64",
+  "toolchain": {
+    "rustc": "1.98.1",
+    "go": "1.26.0",
+    "python": "3.12.14"
+  },
+  "native_sha256": {
+    "libcpa_stg.so": "ede7b5ae3184d2961b8211705e252bedfa3183ad1ab7ded6c0efd988552d0aff",
+    "libcpa_stg_router.so": "d2cd7d4150253fb3af1c20ac33946c5e4947ee3c2d196207b56559744087dad1"
+  }
+}
